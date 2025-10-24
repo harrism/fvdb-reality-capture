@@ -5,35 +5,28 @@
    Extract a triangle mesh from a saved Gaussian splat file with TSDF fusion using depth maps
    rendered from the Gaussian splat model. The algorithm proceeds in three steps:
 
-   1. First, it renders depth and color/feature images from the Gaussian splat radiance field at each
-   of the specified
-      camera views.
+   1. First, it renders depth and color/feature images from the Gaussian splat radiance field at
+      each of the specified camera views.
 
-   2. Second, it integrates the depths and colors/features into a sparse fvdb.Grid in a narrow band
-      around the surface using sparse truncated signed distance field (TSDF) fusion.
-      The result is a sparse voxel grid representation of the scene where each voxel stores a signed
-   distance
-      value and color (or other features).
+   2. Second, it integrates the depths and colors/features into a sparse fvdb.Grid in a narrow
+      band around the surface using sparse truncated signed distance field (TSDF) fusion. The
+      result is a sparse voxel grid representation of the scene where each voxel stores a signed
+      distance value and color (or other features).
 
    3. Third, it extracts a mesh using the sparse marching cubes algorithm implemented in
-   fvdb.Grid.marching_cubes
-      over the Grid and TSDF values. This step produces a triangle mesh with vertex colors sampled
-   from the
-      colors/features stored in the Grid.
+      fvdb.Grid.marching_cubes over the Grid and TSDF values. This step produces a triangle mesh
+      with vertex colors sampled from the colors/features stored in the Grid.
 
    Example usage:
 
       # Extract a mesh from a Gaussian splat model saved in `model.pt` with a truncation margin of
-   0.05
+      # 0.05
       frgs mesh-basic model.pt 0.05 --output-path mesh.ply
 
       # Extract a mesh from a Gaussian splat model saved in `model.ply` with a truncation margin of
-   0.1
-      # with a grid shell thickness of 5 voxels, near plane at 0.1x median depth, far plane at 2.0x
-   median depth
-      # of each images.
-      frgs mesh-basic model.ply 0.1 --output-path mesh.ply --grid-shell-thickness 5.0 --near 0.1
-   --far 2.0
+      # 0.1 with a grid shell thickness of 5 voxels, near plane at 0.1x median depth, far plane at
+      # 2.0x median depth of each image.
+      frgs mesh-basic model.ply 0.1 --output-path mesh.ply --grid-shell-thickness 5.0 --near 0.1 --far 2.0
 
    ╭─ positional arguments ─────────────────────────────────────────────────────────────────────────╮
    │ PATH                    Path to the input PLY or checkpoint file. Must end in .ply, .pt, or    │

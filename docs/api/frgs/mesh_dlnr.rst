@@ -11,24 +11,20 @@
    2. Second, it integrates the depths and colors/features into a sparse fvdb.Grid in a narrow band
       around the surface using sparse truncated signed distance field (TSDF) fusion.
       The result is a sparse voxel grid representation of the scene where each voxel stores a signed
-   distance
-      value and color (or other features).
+      distance value and color (or other features).
 
    3. Third, it extracts a mesh using the sparse marching cubes algorithm implemented in
-   fvdb.Grid.marching_cubes
-      over the Grid and TSDF values. This step produces a triangle mesh with vertex colors sampled
-   from the
-      colors/features stored in the Grid.
+      fvdb.Grid.marching_cubes over the Grid and TSDF values. This step produces a triangle mesh with
+      vertex colors sampled from the colors/features stored in the Grid.
 
    Example usage:
 
       # Extract a mesh from a Gaussian splat model saved in `model.pt` with a truncation margin of
-   0.05
+      # 0.05
       frgs mesh-dlnr model.pt 0.05 --output-path mesh.ply
 
       # Extract a mesh from a Gaussian splat model saved in `model.ply` with a truncation margin of
-   0.1
-      # with a grid shell thickness of 5 voxels
+      #0.1 with a grid shell thickness of 5 voxels
       frgs mesh-dlnr model.ply 0.1 --output-path mesh.ply --grid-shell-thickness 5.0
 
    ╭─ positional arguments ─────────────────────────────────────────────────────────────────────────╮

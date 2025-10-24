@@ -10,7 +10,7 @@
         depth discontinuities. The result is an image mask where pixels near depth edges are marked.
         3. Dilate the edge mask to remove depth samples near edges.
         4. Remove points from the point cloud where the corresponding depth pixel is marked in the
-    dilated edge mask.
+           dilated edge mask.
 
     Example usage:
 

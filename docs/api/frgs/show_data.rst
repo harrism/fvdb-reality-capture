@@ -8,23 +8,22 @@
     The dataset folder should either contain a colmap dataset, a set of e57 files, a
     simple_directory dataset:
 
-    COLMAP Data format: A folder should containining:
+    COLMAP Data format: A folder should containing:
         - cameras.txt
         - images.txt
         - points3D.txt
         - A folder named "images" containing the image files.
         - An optional "masks" folder with the same layout as images containing masks of which pixels
-    are valid.
+          are valid.
 
     E57 format: A folder containing one or more .e57 files.
 
     Simple Directory format: A folder containing:
         - images/ A directory of images (jpg, png, etc).
         - An optional "masks/" folder with the same layout as images containing masks of which
-    pixels are valid.
+          pixels are valid.
         - A cameras.json file containing camera intrinsics and extrinsics for each image. It should
-    be a list of objects
-            with the following format:
+          be a list of objects with the following format:
                 "camera_name": "camera_0000",
                 "width": 2048,
                 "height": 2048,

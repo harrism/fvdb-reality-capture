@@ -133,11 +133,17 @@ def main(
     training_params = config["optimization_config"]["training_arguments"]
 
     # Determine the optimizer type
-    optimizer_class = (
-        frc.radiance_fields.GaussianSplatOptimizerMCMCConfig
-        if config["optimization_config"]["splat_optimizer"] == "GaussianSplatOptimizerMCMC"
-        else frc.radiance_fields.GaussianSplatOptimizerConfig
-    )
+    splat_optimizer_name = config["optimization_config"]["splat_optimizer"]
+    optimizer_class_map = {
+        "GaussianSplatOptimizer": frc.radiance_fields.GaussianSplatOptimizerConfig,
+        "GaussianSplatOptimizerMCMC": frc.radiance_fields.GaussianSplatOptimizerMCMCConfig,
+        "GaussianSplatOptimizerMCMCControlled": frc.radiance_fields.GaussianSplatOptimizerMCMCControlledConfig,
+    }
+    optimizer_class = optimizer_class_map.get(splat_optimizer_name)
+    if optimizer_class is None:
+        raise ValueError(
+            f"Unknown splat_optimizer: {splat_optimizer_name}. " f"Must be one of: {sorted(optimizer_class_map.keys())}"
+        )
 
     logger.info(f"Using optimizer class: {optimizer_class.__name__}")
 

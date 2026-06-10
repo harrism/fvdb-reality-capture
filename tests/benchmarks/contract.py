@@ -134,6 +134,34 @@ MCMC_OPTIMIZER_EXTRA_KEYS = {
 Extra fields allowed only when using `GaussianSplatOptimizerMCMCConfig`.
 """
 
+MCMC_CONTROLLED_OPTIMIZER_EXTRA_KEYS = MCMC_OPTIMIZER_EXTRA_KEYS | {
+    # Metric controller parameters
+    "control_metric",
+    "probe_every_k_refines",
+    "probe_n_images",
+    "trend_window",
+    "slope_threshold",
+    "slope_threshold_high",
+    "effectiveness_threshold",
+    "min_measurements_before_control",
+    "cooldown_probes",
+    "max_new_gaussians_per_refine",
+    "effectiveness_decay_ratio",
+    # Controller type selection
+    "controller_type",
+    # ESC-specific parameters (used when controller_type == "esc")
+    "perturbation_fraction",
+    "prune_fraction",
+    "dwell_probes",
+    "gradient_window",
+    "min_warmup_probes",
+    "recheck_probes",
+    "noise_deadband",
+}
+"""
+Extra fields allowed only when using `GaussianSplatOptimizerMCMCControlledConfig`.
+"""
+
 
 def load_benchmark_yaml(path: str) -> dict[str, Any]:
     """
@@ -270,10 +298,15 @@ def validate_benchmark_yaml(config: dict[str, Any], *, require_run_paths: bool =
     opt_section = config.get("optimization_config", {})
     if not isinstance(opt_section, dict):
         _raise_contract_error("optimization_config must be a dict")
+    _ALLOWED_OPTIMIZERS = (
+        "GaussianSplatOptimizer",
+        "GaussianSplatOptimizerMCMC",
+        "GaussianSplatOptimizerMCMCControlled",
+    )
     splat_optimizer = opt_section.get("splat_optimizer")
-    if splat_optimizer not in ("GaussianSplatOptimizer", "GaussianSplatOptimizerMCMC"):
+    if splat_optimizer not in _ALLOWED_OPTIMIZERS:
         _raise_contract_error(
-            "optimization_config.splat_optimizer must be GaussianSplatOptimizer or GaussianSplatOptimizerMCMC",
+            f"optimization_config.splat_optimizer must be one of {_ALLOWED_OPTIMIZERS}",
             details={"splat_optimizer": splat_optimizer},
         )
 
@@ -287,9 +320,11 @@ def validate_benchmark_yaml(config: dict[str, Any], *, require_run_paths: bool =
     opt_cfg = opt_section.get("optimization_config", {})
     if not isinstance(opt_cfg, dict):
         _raise_contract_error("optimization_config.optimization_config must be a dict")
-    allowed_opt_keys = OPTIMIZER_CONFIG_KEYS | (
-        MCMC_OPTIMIZER_EXTRA_KEYS if splat_optimizer == "GaussianSplatOptimizerMCMC" else set()
-    )
+    _EXTRA_KEYS_BY_OPTIMIZER = {
+        "GaussianSplatOptimizerMCMC": MCMC_OPTIMIZER_EXTRA_KEYS,
+        "GaussianSplatOptimizerMCMCControlled": MCMC_CONTROLLED_OPTIMIZER_EXTRA_KEYS,
+    }
+    allowed_opt_keys = OPTIMIZER_CONFIG_KEYS | _EXTRA_KEYS_BY_OPTIMIZER.get(splat_optimizer, set())
     opt_extra = set(opt_cfg.keys()) - allowed_opt_keys
     if opt_extra:
         _raise_contract_error("Unknown optimization_config keys", details={"extra": sorted(opt_extra)})
@@ -408,9 +443,11 @@ def validate_comparative_opt_config(config: dict[str, Any]) -> None:
         if not isinstance(opt_cfg, dict):
             _raise_contract_error("FVDB opt config optimization_config must be a dict")
         splat_optimizer = config.get("splat_optimizer", "GaussianSplatOptimizer")
-        allowed_opt_keys = OPTIMIZER_CONFIG_KEYS | (
-            MCMC_OPTIMIZER_EXTRA_KEYS if splat_optimizer == "GaussianSplatOptimizerMCMC" else set()
-        )
+        _EXTRA_KEYS_BY_OPT = {
+            "GaussianSplatOptimizerMCMC": MCMC_OPTIMIZER_EXTRA_KEYS,
+            "GaussianSplatOptimizerMCMCControlled": MCMC_CONTROLLED_OPTIMIZER_EXTRA_KEYS,
+        }
+        allowed_opt_keys = OPTIMIZER_CONFIG_KEYS | _EXTRA_KEYS_BY_OPT.get(splat_optimizer, set())
         opt_extra = set(opt_cfg.keys()) - allowed_opt_keys
         if opt_extra:
             _raise_contract_error(

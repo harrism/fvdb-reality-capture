@@ -14,6 +14,11 @@ from .gaussian_splat_optimizer_mcmc import (
     GaussianSplatOptimizerMCMC,
     GaussianSplatOptimizerMCMCConfig,
 )
+from .gaussian_splat_optimizer_mcmc_controlled import (
+    GaussianSplatOptimizerMCMCControlled,
+    GaussianSplatOptimizerMCMCControlledConfig,
+    MetricController,
+)
 from .gaussian_splat_reconstruction import (
     GaussianSplatReconstruction,
     GaussianSplatReconstructionConfig,
@@ -36,6 +41,9 @@ __all__ = [
     "GaussianSplatOptimizerConfig",
     "GaussianSplatOptimizerMCMC",
     "GaussianSplatOptimizerMCMCConfig",
+    "GaussianSplatOptimizerMCMCControlled",
+    "GaussianSplatOptimizerMCMCControlledConfig",
+    "MetricController",
     "InsertionGrad2dThresholdMode",
     "SpatialScaleMode",
 ]

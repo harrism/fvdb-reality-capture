@@ -1222,6 +1222,63 @@ class GaussianSplatReconstruction:
             f"Clipped {num_clipped_gaussians:,} Gaussians outside the crop bounding box min={bbox_min}, max={bbox_max}."
         )
 
+    @torch.no_grad()
+    def _probe_metrics(self, n_images: int = 3) -> dict[str, float]:
+        """
+        Render a random subset of validation images and return mean PSNR and SSIM.
+
+        This provides a cheap quality probe for the metric-controlled optimizer
+        without the overhead of a full evaluation pass.
+
+        Args:
+            n_images: Number of random validation images to render and evaluate.
+
+        Returns:
+            Dictionary with ``"psnr"`` (in dB) and ``"ssim"`` (0-1) averaged over the sampled images.
+        """
+        if len(self.validation_dataset) == 0:
+            return {"psnr": 0.0, "ssim": 0.0}
+
+        device = self.device
+        n_images = min(n_images, len(self.validation_dataset))
+        indices = random.sample(range(len(self.validation_dataset)), n_images)
+        subset = torch.utils.data.Subset(self.validation_dataset, indices)
+        loader = torch.utils.data.DataLoader(subset, batch_size=1, shuffle=False, num_workers=0)
+
+        psnr_values: list[float] = []
+        ssim_values: list[float] = []
+        for data in loader:
+            world_to_cam_matrices = data["world_to_camera"].to(device)
+            projection_matrices = data["projection"].to(device)
+            camera_models = data["camera_model"].to(device)
+            distortion_coeffs = data["distortion_coeffs"].to(device)
+            ground_truth_image = data["image"].to(device) / 255.0
+
+            height, width = ground_truth_image.shape[1:3]
+
+            render_outputs = self._render_backend.forward_eval(
+                model=self.model,
+                config=self.config,
+                world_to_camera_matrices=world_to_cam_matrices,
+                projection_matrices=projection_matrices,
+                camera_models=camera_models,
+                distortion_coeffs=distortion_coeffs,
+                image_width=width,
+                image_height=height,
+                sh_degree_to_use=self.config.sh_degree,
+            )
+            predicted_image = torch.clamp(render_outputs.image, 0.0, 1.0)
+
+            predicted_image = predicted_image.permute(0, 3, 1, 2).contiguous()
+            ground_truth_image = ground_truth_image.permute(0, 3, 1, 2).contiguous()
+            psnr_values.append(psnr(predicted_image, ground_truth_image).item())
+            ssim_values.append(ssim(predicted_image, ground_truth_image).item())
+
+        return {
+            "psnr": sum(psnr_values) / len(psnr_values),
+            "ssim": sum(ssim_values) / len(ssim_values),
+        }
+
     def optimize(self, show_progress: bool = True, log_tag: str = "reconstruct") -> None:
         """
         Run the reconstruction optimization loop to optimize reconstruct a Gaussian Splatting radiance field from a set of posed images.
@@ -1475,13 +1532,68 @@ class GaussianSplatReconstruction:
                     and self._global_step % refine_every_step == 0
                     and self._global_step < refine_stop_step
                 ):
-                    self.optimizer.refine()
+                    refine_stats = self.optimizer.refine()
+
+                    if refine_stats.get("num_relocated") is not None:
+                        self._writer.log_metric(
+                            self._global_step, f"{log_tag}/num_relocated", refine_stats["num_relocated"]
+                        )
+                    if refine_stats.get("num_added") is not None:
+                        self._writer.log_metric(self._global_step, f"{log_tag}/num_added", refine_stats["num_added"])
 
                     # If you specified a crop bounding box, clip the Gaussians that are outside the crop
                     # bounding box. This is useful if you want to reconstruct on a subset of the scene
                     # and don't want to waste resources on Gaussians that are outside the crop.
                     if self.config.remove_gaussians_outside_scene_bbox:
                         self._clip_gaussians_to_scene_bbox()
+
+                    # Metric-controlled insertion: probe quality periodically and feed the controller
+                    if hasattr(self.optimizer, "observe_metric") and hasattr(self.optimizer, "probe_every_k_refines"):
+                        if self.optimizer._refine_count % self.optimizer.probe_every_k_refines == 0:
+                            probe = self._probe_metrics(n_images=self.optimizer.probe_n_images)
+                            control_metric = self.optimizer.control_metric
+                            new_rate = self.optimizer.observe_metric(self._global_step, probe[control_metric])
+                            self._writer.log_metric(self._global_step, f"{log_tag}/probe_psnr", probe["psnr"])
+                            self._writer.log_metric(self._global_step, f"{log_tag}/probe_ssim", probe["ssim"])
+                            self._writer.log_metric(self._global_step, f"{log_tag}/controlled_insertion_rate", new_rate)
+                            if hasattr(self.optimizer, "controller"):
+                                ctrl = self.optimizer.controller
+                                self._writer.log_metric(
+                                    self._global_step, f"{log_tag}/controller_saturated", float(ctrl.is_saturated)
+                                )
+                                self._writer.log_metric(
+                                    self._global_step, f"{log_tag}/controller_cooldown", float(ctrl.is_cooling_down)
+                                )
+                                self._writer.log_metric(
+                                    self._global_step,
+                                    f"{log_tag}/controller_peak_effectiveness",
+                                    ctrl.peak_effectiveness,
+                                )
+                                if hasattr(ctrl, "last_gradient"):
+                                    state_map = {
+                                        "WARMUP": 0,
+                                        "INSERT": 1,
+                                        "DWELL": 2,
+                                        "ESTIMATE": 3,
+                                        "HOLD": 4,
+                                        "PRUNE": 5,
+                                    }
+                                    self._writer.log_metric(
+                                        self._global_step,
+                                        f"{log_tag}/esc_state",
+                                        state_map.get(ctrl.state, -1),
+                                    )
+                                    if ctrl.last_gradient is not None:
+                                        self._writer.log_metric(
+                                            self._global_step,
+                                            f"{log_tag}/esc_gradient",
+                                            ctrl.last_gradient,
+                                        )
+                                    self._writer.log_metric(
+                                        self._global_step,
+                                        f"{log_tag}/esc_baseline_slope",
+                                        ctrl.baseline_slope,
+                                    )
 
                 # Step the Gaussian optimizer
                 self.optimizer.step()

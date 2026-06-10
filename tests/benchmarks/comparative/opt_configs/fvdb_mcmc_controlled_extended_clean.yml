@@ -1,0 +1,76 @@
+# FVDB MCMC Controlled configuration -- "extended_clean" ablation variant.
+# Extended refinement window (200) + more probe images (8).
+# Tests the combined effect of both fixes.
+framework: fvdb
+name: fvdb_mcmc_controlled_extended_clean
+color: "#9467bd"  # Purple
+
+splat_optimizer: GaussianSplatOptimizerMCMCControlled
+
+reconstruction_config:
+  max_epochs: 200
+  max_steps: null
+  eval_at_percent:
+    - 10
+    - 20
+    - 30
+    - 40
+    - 50
+    - 60
+    - 70
+    - 80
+    - 90
+    - 100
+  save_at_percent:
+    - 100
+
+  batch_size: 1
+  crops_per_image: 1
+  increase_sh_degree_every_epoch: 5
+  lpips_net: alex
+  refine_start_epoch: 3
+  refine_stop_epoch: 200         # <-- extended to full training (up from 100)
+  refine_every_epoch: 0.75
+  ignore_masks: false
+  remove_gaussians_outside_scene_bbox: false
+
+  # Pose optimization
+  optimize_camera_poses: false
+  pose_opt_lr: 1.0e-05
+  pose_opt_reg: 1.0e-06
+  pose_opt_lr_decay: 1.0
+  pose_opt_start_epoch: 0
+  pose_opt_stop_epoch: 200
+  pose_opt_init_std: 1.0e-04
+
+  # Gaussian rendering parameters
+  min_radius_2d: 0.0
+  eps_2d: 0.3
+  tile_size: 16
+
+# Metric-controlled MCMC optimizer configuration
+optimization_config:
+  control_metric: psnr
+  probe_every_k_refines: 5
+  probe_n_images: 8            # <-- 8 images (up from 3) for cleaner probe signal
+  trend_window: 5
+  slope_threshold: 1.0e-4
+  slope_threshold_high: 2.0e-4    # <-- hysteresis: higher threshold for INSERT->HOLD
+  effectiveness_threshold: 1.0e-7  # <-- anti-windup: stop if dPSNR/dGaussians < threshold
+  min_measurements_before_control: 3
+
+training_arguments:
+  image_downsample_factor: 4
+  points_percentile_filter: 0.0
+  normalization_type: pca
+  crop_bbox: null
+  crop_to_points: false
+  min_points_per_image: 5
+
+  device: cuda
+  use_every_n_as_val: 10
+
+  log_tensorboard_every: -1
+  log_images_to_tensorboard: false
+  save_results: true
+  save_eval_images: false
